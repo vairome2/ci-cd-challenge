@@ -1,31 +1,57 @@
-name: React App Deploy
+name: Build & deploy
 
 on:
   push:
     branches:
-      - "main"
-     # Triggers the workflow on push event only for the master branch
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
-    runs-on: ubuntu-latest #This line refers to the system that runs the action
-
-    strategy:
-      matrix:
-        node-version: [15.x] #Here we set the node version to 15.x
+    name: Build
+    runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2 #This is a special action provided by github to make a checkout of the v1 
+    - name: Checkout code
+      uses: actions/checkout@v2
+    
+    - name: Install Node.js
+      uses: actions/setup-node@v1
+      with:
+        node-version: 13.x
+    
+    - name: Install NPM packages
+      run: npm ci
+    
+    - name: Build project
+      run: npm run build
+    
+    - name: Run tests
+      run: npm run test
 
-      - name: Install and build
-        run: |
-          npm install
-          npm run build
-         #Here we run our scripts
-      
-      - name: Deploy
-        uses: JamesIves/github-pages-deploy-action@4.1.1 #This is a marketplace action to publish pages to github.io
-        with:
-          branch: gh-pages
-          folder: build # The folder the action should deploy.        
+    - name: Upload production-ready build files
+      uses: actions/upload-artifact@v2
+      with:
+        name: production-files
+        path: ./build
+  
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: production-files
+        path: ./build
+
+    - name: Deploy to gh-pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./build
